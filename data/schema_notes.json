@@ -1,0 +1,34 @@
+{
+  "tables": {
+    "customers": {
+      "description": "People who buy from the shop. One row per customer. Revenue, spend and buyers are found by joining orders.",
+      "columns": {
+        "country": "Full country name, for example 'United States' or 'India'",
+        "city": "City of residence",
+        "signup_date": "Date the customer registered"
+      }
+    },
+    "products": {
+      "description": "Catalogue of items for sale with category, price and stock level.",
+      "columns": {
+        "category": "Product category",
+        "price": "Current list price",
+        "stock": "Units in stock"
+      }
+    },
+    "orders": {
+      "description": "Purchases placed by customers. One row per order; status tracks fulfilment. Order totals come from order_items.",
+      "columns": {
+        "order_date": "Date the order was placed",
+        "status": "Fulfilment status of the order"
+      }
+    },
+    "order_items": {
+      "description": "Line items of each order: which product, how many, at what price. Revenue and sales amounts = quantity * unit_price.",
+      "columns": {
+        "quantity": "Units purchased",
+        "unit_price": "Price per unit at purchase time"
+      }
+    }
+  }
+}

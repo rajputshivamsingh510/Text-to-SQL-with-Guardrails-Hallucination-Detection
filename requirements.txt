@@ -1,0 +1,9 @@
+# API service. Tested with the versions noted; sqlglot is pinned to its tested major because its AST API changes between majors.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+sqlalchemy>=2.0,<3
+psycopg[binary]>=3.2
+sqlglot>=30,<31
+groq>=0.30
+python-dotenv>=1.0

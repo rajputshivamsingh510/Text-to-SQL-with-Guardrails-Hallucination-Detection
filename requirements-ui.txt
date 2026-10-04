@@ -1,0 +1,4 @@
+# UI service only (kept separate so the API image stays small)
+streamlit>=1.60,<2
+requests>=2.32
+pandas>=2.2

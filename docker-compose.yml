@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shopadmin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shopadmin -d shop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env                # GROQ_API_KEY, LLM_PROVIDER, LLM_MODEL, guardrail settings, API_KEY
+    environment:                  # these override anything in .env
+      DATABASE_URL: postgresql://shopadmin:${POSTGRES_PASSWORD}@db:5432/shop
+      ADMIN_DATABASE_URL: postgresql://shopadmin:${POSTGRES_PASSWORD}@db:5432/shop
+      AUTO_SEED_DEMO: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"     # reachable from the server itself only; the UI talks to it over the Docker network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8000
+      API_KEY: ${API_KEY:-}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+
+volumes:
+  pgdata:

@@ -1,0 +1,12 @@
+[
+  {"question": "How many customers do we have in each country?",
+   "sql": "SELECT country, COUNT(*) AS customers FROM customers GROUP BY country ORDER BY customers DESC"},
+  {"question": "What are the 5 most expensive products?",
+   "sql": "SELECT name, category, price FROM products ORDER BY price DESC LIMIT 5"},
+  {"question": "Total revenue by product category",
+   "sql": "SELECT p.category, SUM(oi.quantity * oi.unit_price) AS revenue FROM order_items oi JOIN products p ON p.id = oi.product_id JOIN orders o ON o.id = oi.order_id WHERE o.status <> 'cancelled' GROUP BY p.category ORDER BY revenue DESC"},
+  {"question": "Which customers placed the most orders?",
+   "sql": "SELECT c.name, COUNT(o.id) AS order_count FROM customers c JOIN orders o ON o.customer_id = c.id GROUP BY c.name ORDER BY order_count DESC LIMIT 10"},
+  {"question": "How many orders were cancelled?",
+   "sql": "SELECT COUNT(*) AS cancelled_orders FROM orders WHERE status = 'cancelled'"}
+]
