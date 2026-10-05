@@ -1,6 +1,6 @@
 # Text-to-SQL with Guardrails & Hallucination Detection
 
-[![Open Live Demo](https://img.shields.io/badge/Live%20Demo-Open%20App-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](YOUR_STREAMLIT_APP_URL)
+[![Open Live Demo](https://img.shields.io/badge/Live%20Demo-Open%20App-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://text-to-sql-with-guardrails-hallucination-detection-39ngek5caa.streamlit.app/)
 
 Ask questions about a database in plain English. An LLM writes the SQL, but nothing it produces is trusted:
 every query is validated, executed read-only, and fact-checked before an answer is shown.
