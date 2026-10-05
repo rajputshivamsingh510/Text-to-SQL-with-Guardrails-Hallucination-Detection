@@ -1,20 +1,28 @@
-"""Streamlit front-end. Talks to the FastAPI service; contains no database or LLM logic itself.
+"""Streamlit front-end with two modes.
 
-    API_URL=http://localhost:8000 streamlit run ui/streamlit_app.py
+* API mode      (API_URL is set):   talks to the FastAPI service. Used by docker compose / split deployments.
+* Embedded mode (API_URL not set):  runs the guardrail pipeline inside this app on a seeded SQLite demo database.
+                                    This is what Streamlit Community Cloud uses: only GROQ_API_KEY is needed.
+
+    streamlit run ui/streamlit_app.py
 """
 import os
-from dotenv import load_dotenv
-load_dotenv()
+import sys
+from pathlib import Path
 
 import pandas as pd
 import requests
 import streamlit as st
 
-API_URL = os.environ.get("API_URL", "http://localhost:8000").rstrip("/")
-if not API_URL.startswith(("http://", "https://")):
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # so `import app...` works from ui/
+
+API_URL = os.environ.get("API_URL", "").strip().rstrip("/")
+if API_URL and not API_URL.startswith(("http://", "https://")):
     API_URL = "https://" + API_URL
 API_KEY = os.environ.get("API_KEY", "")
 HEADERS = {"X-API-Key": API_KEY} if API_KEY else {}
+EMBEDDED = not API_URL
+MAX_DEMO_QUERIES = int(os.environ.get("DEMO_MAX_QUERIES", "30"))  # per browser session, protects the LLM quota
 
 EXAMPLES = [
     "How many customers do we have in each country?",
@@ -39,6 +47,34 @@ ICON = {"pass": "✅", "fail": "❌", "warn": "⚠️", "info": "ℹ️", "skip"
 st.set_page_config(page_title="Text-to-SQL with Guardrails", page_icon="🛡️", layout="wide")
 st.title("🛡️ Text-to-SQL with Guardrails & Hallucination Detection")
 st.caption("Ask questions in plain English. Every query is validated, executed read-only, and fact-checked before you see it.")
+
+
+@st.cache_resource(show_spinner="Starting the demo database and guardrails…")
+def get_embedded_pipeline():
+    """Build the pipeline once per server process (embedded mode only)."""
+    try:  # Streamlit secrets -> environment, so Settings.from_env() sees them
+        for k, v in st.secrets.items():
+            if isinstance(v, (str, int, float, bool)):
+                os.environ.setdefault(k, str(v))
+    except Exception:
+        pass
+    os.environ.setdefault("AUTO_SEED_DEMO", "true")
+    os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/t2sql_demo.db")
+    os.environ.setdefault("BLOCKED_COLUMNS", "customers.email,customers.phone")
+    from app.config import Settings
+    from app.llm import build_llm
+    from app.main import build_pipeline
+
+    settings = Settings.from_env()
+    llm = build_llm(settings)
+    return build_pipeline(settings, llm), llm is not None
+
+
+def call_embedded(question: str) -> dict:
+    pipeline, llm_ready = get_embedded_pipeline()
+    if not llm_ready:
+        return {"status": "error", "message": "The LLM is not configured (set GROQ_API_KEY in the app secrets)."}
+    return pipeline.run(question).model_dump()
 
 
 def call_api(question: str) -> dict:
@@ -86,12 +122,19 @@ with st.sidebar:
         if st.button(ex, width="stretch"):
             st.session_state["pending"] = ex
     st.divider()
-    st.caption(f"API: {API_URL}")
-    try:
-        h = requests.get(f"{API_URL}/health", timeout=60).json()
-        st.caption("API online" + ("" if h.get("llm_configured") else " (LLM key missing)"))
-    except Exception:
-        st.caption("API unreachable (it may be waking up; free instances sleep when idle).")
+    if EMBEDDED:
+        try:
+            _, ready = get_embedded_pipeline()
+            st.caption("Demo database ready" + ("" if ready else " (LLM key missing)"))
+        except Exception as e:
+            st.caption(f"Could not start the demo: {e}")
+    else:
+        st.caption(f"API: {API_URL}")
+        try:
+            h = requests.get(f"{API_URL}/health", timeout=60).json()
+            st.caption("API online" + ("" if h.get("llm_configured") else " (LLM key missing)"))
+        except Exception:
+            st.caption("API unreachable (it may be waking up; free instances sleep when idle).")
 
 if "history" not in st.session_state:
     st.session_state["history"] = []
@@ -108,9 +151,15 @@ if question:
         st.write(question)
     with st.chat_message("assistant"):
         with st.spinner("Checking, generating, validating, verifying…"):
-            try:
-                res = call_api(question)
-            except requests.RequestException as e:
-                res = {"status": "error", "message": f"Could not reach the API: {e}"}
+            st.session_state["n_queries"] = st.session_state.get("n_queries", 0) + 1
+            if EMBEDDED and st.session_state["n_queries"] > MAX_DEMO_QUERIES:
+                res = {"status": "error", "message": f"Demo limit reached ({MAX_DEMO_QUERIES} questions per session). Refresh to continue."}
+            else:
+                try:
+                    res = call_embedded(question) if EMBEDDED else call_api(question)
+                except requests.RequestException as e:
+                    res = {"status": "error", "message": f"Could not reach the API: {e}"}
+                except Exception as e:  # embedded mode: surface the error instead of a stack trace
+                    res = {"status": "error", "message": f"Something went wrong: {e}"}
         render(res)
     st.session_state["history"].append((question, res))
