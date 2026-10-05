@@ -217,3 +217,8 @@ docs/images/                  README screenshots
   (`SchemaRetriever.retrieve()` is the only interface to replace).
 - SQLite (local mode) has no statement timeout or cost ceiling; Postgres does.
 - There is no rate limiting. Anyone with access to the public UI spends your LLM quota, so add a limit before sharing the demo widely.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
