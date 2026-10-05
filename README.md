@@ -131,55 +131,39 @@ All via environment variables (see `.env.example` for the full list). The import
 
 Never commit `.env`. Commit `.env.example` with placeholder values only.
 
-## Deploy
+## Deploy the live demo (Streamlit Community Cloud)
 
-The API and the UI are two separate services deployed from the same GitHub repo.
+The UI has two modes. When `API_URL` is **not** set it runs the whole guardrail pipeline inside the Streamlit app on a
+seeded SQLite demo database, so the public demo needs no separate API server and no Docker.
 
-### 1. API: Render web service
+1. Push the repo to GitHub (never commit `.env`).
+2. On [share.streamlit.io](https://share.streamlit.io): **New app** → pick the repo → main file `ui/streamlit_app.py`.
+   Under **Advanced settings** choose Python 3.12.
+3. In **Secrets** paste (valid TOML, with quotes):
+   ```toml
+   GROQ_API_KEY = "gsk_your_key"
+   LLM_PROVIDER = "groq"
+   LLM_MODEL = "openai/gpt-oss-120b"
+   ```
+   Do **not** set `API_URL` there, otherwise the app tries to call an API server instead.
+4. Deploy. The demo database is created on startup (it lives in temporary storage and is re-seeded after a restart),
+   `customers.email` and `customers.phone` are hidden by default, and each browser session is capped at
+   30 questions (`DEMO_MAX_QUERIES`) to protect the LLM quota.
 
-New → **Web Service** → connect the repo.
-
-| Setting | Value |
-|---|---|
-| Runtime | Python (or Docker with `./Dockerfile`) |
-| Build command | `pip install -r requirements.txt` |
-| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-| Health check path | `/health` |
-
-Environment variables: `GROQ_API_KEY`, `LLM_PROVIDER=groq`, `LLM_MODEL`, `API_KEY` (a new strong value),
-`BLOCKED_COLUMNS=customers.email,customers.phone`, `PII_MODE=mask`, and for the SQLite demo
-`DATABASE_URL=sqlite:///./demo.db` with `AUTO_SEED_DEMO=true` (free instances have no persistent disk, so the demo
-data is re-created on each start).
-
-### 2. UI: Streamlit Community Cloud (or a second Render web service)
-
-Point the app at `ui/streamlit_app.py`, install from `requirements-ui.txt`, and add these secrets:
-
-```toml
-API_URL = "https://<your-api>.onrender.com"
-API_KEY = "<same value as the API service>"
-```
-
-On Render instead, use build command `pip install -r requirements-ui.txt` and start command
-`streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`.
-
-### 3. Verify
-
-`curl https://<api>/health` should show `"llm_configured": true`; then use the UI's example buttons.
+For the production-style version (FastAPI + Postgres + read-only role) use Docker as shown above, or deploy the API on
+any host and set `API_URL` / `API_KEY` for the UI.
 
 ### Moving to Postgres (recommended for anything beyond a demo)
 
-1. Create a Postgres database (e.g. Render PostgreSQL).
-2. Seed it once: set `ADMIN_DATABASE_URL` to its **External** URL and run `python scripts/seed_demo.py`.
+1. Create a Postgres database.
+2. Seed it once: set `ADMIN_DATABASE_URL` to its owner URL and run `python scripts/seed_demo.py`.
 3. Create the least-privilege role:
    ```bash
-   psql "<External Database URL>" -v ro_password='a-strong-password' -f scripts/create_readonly_role.sql
+   psql "<owner URL>" -v ro_password='a-strong-password' -f scripts/create_readonly_role.sql
    ```
-4. On the API service set `DATABASE_URL` to the **Internal** URL with user `t2sql_readonly` and that password, and
-   `ADMIN_DATABASE_URL` to the Internal owner URL.
+4. Set the API's `DATABASE_URL` to the same database with user `t2sql_readonly` and that password.
 
-Re-run step 3 if you re-seed. Free web services sleep when idle and free databases are time-limited, so check
-Render's current pricing. Embeddings are not used, so memory stays small.
+Re-run step 3 if you re-seed.
 
 ## Using your own database
 
@@ -217,8 +201,3 @@ docs/images/                  README screenshots
   (`SchemaRetriever.retrieve()` is the only interface to replace).
 - SQLite (local mode) has no statement timeout or cost ceiling; Postgres does.
 - There is no rate limiting. Anyone with access to the public UI spends your LLM quota, so add a limit before sharing the demo widely.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
-
