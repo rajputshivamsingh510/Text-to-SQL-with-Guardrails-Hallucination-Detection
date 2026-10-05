@@ -41,7 +41,6 @@ class Settings:
     sample_values: bool = True  # show the LLM the distinct values of low-cardinality text columns
 
     # LLM
-       # LLM
     llm_provider: str = "groq"
     llm_model: str = "openai/gpt-oss-120b"
     groq_api_key: str | None = None

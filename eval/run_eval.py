@@ -60,7 +60,6 @@ def full_run(settings: Settings) -> dict:
     if llm is None:
         sys.exit("Set GROQ_API_KEY for the full evaluation, or use --guardrails-only.")
     pipe = build_pipeline(settings, llm)
-    pipe = build_pipeline(settings, AnthropicLLM(settings.anthropic_api_key, settings.llm_model))
     correct, false_blocks, latencies, details = 0, 0, [], []
     for item in DATA["answerable"]:
         resp = pipe.run(item["question"])

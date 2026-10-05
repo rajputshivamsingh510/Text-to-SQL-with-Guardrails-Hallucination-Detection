@@ -11,7 +11,6 @@ from sqlalchemy import text
 from app.config import Settings
 from app.db import make_engine
 from app.demo_data import has_data, seed
-from app.llm import LLM, AnthropicLLM
 from app.models import QueryRequest, QueryResponse
 from app.pipeline import Pipeline
 from app.retriever import SchemaRetriever, load_examples

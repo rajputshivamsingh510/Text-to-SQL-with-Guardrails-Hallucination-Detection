@@ -3,6 +3,8 @@
     API_URL=http://localhost:8000 streamlit run ui/streamlit_app.py
 """
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 import pandas as pd
 import requests
